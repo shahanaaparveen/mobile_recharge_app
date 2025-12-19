@@ -1,0 +1,29 @@
+services:
+  # Backend API Service
+  - type: web
+    name: mobile-recharge-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false # You'll need to set this manually with MongoDB Atlas connection string
+      - key: PORT
+        value: 10000
+
+  # Frontend Static Site
+  - type: web
+    name: mobile-recharge-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: mobile-recharge-backend
+          property: host

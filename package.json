@@ -1,0 +1,21 @@
+{
+  "name": "mobile-recharge-app",
+  "version": "1.0.0",
+  "description": "A modern mobile recharge web application with React frontend and Node.js backend",
+  "scripts": {
+    "install-frontend": "cd frontend && npm install",
+    "install-backend": "cd backend && npm install",
+    "install-all": "npm run install-frontend && npm run install-backend",
+    "dev-frontend": "cd frontend && npm run dev",
+    "dev-backend": "cd backend && npm run dev",
+    "build-frontend": "cd frontend && npm run build",
+    "start-backend": "cd backend && npm start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shahanaaparveen/mobile_recharge_app.git"
+  },
+  "keywords": ["mobile", "recharge", "react", "nodejs", "express"],
+  "author": "Shahana Parveen",
+  "license": "MIT"
+}
