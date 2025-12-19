@@ -16,6 +16,7 @@ import Offers from './pages/Offers';
 import History from './pages/History';
 import About from './pages/About';
 import Profile from './pages/Profile';
+import Admin from './pages/Admin';
 
 function AppContent() {
   const location = useLocation();
@@ -83,6 +84,7 @@ function AppContent() {
             </ProtectedRoute>
           } 
         />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
     </div>
   );

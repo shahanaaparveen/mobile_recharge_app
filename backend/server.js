@@ -147,6 +147,39 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
   }
 });
 
+// Admin: Get all transactions
+app.get('/api/admin/transactions', async (req, res) => {
+  try {
+    const transactions = await Transaction.find()
+      .sort({ createdAt: -1 })
+      .limit(100);
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch transactions' });
+  }
+});
+
+// Admin: Get statistics
+app.get('/api/admin/stats', async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const totalTransactions = await Transaction.countDocuments();
+    const totalRevenue = await Transaction.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const successRate = await Transaction.countDocuments({ status: 'success' });
+    
+    res.json({
+      totalUsers,
+      totalTransactions,
+      totalRevenue: totalRevenue[0]?.total || 0,
+      successRate: totalTransactions > 0 ? ((successRate / totalTransactions) * 100).toFixed(1) : 0
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch statistics' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
