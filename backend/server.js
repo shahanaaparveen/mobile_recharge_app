@@ -23,7 +23,23 @@ app.get('/health', (req, res) => {
 
 // MongoDB Connection
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(async () => {
+    console.log('Connected to MongoDB');
+    
+    // Seed initial plans if none exist
+    const planCount = await Plan.countDocuments();
+    if (planCount === 0) {
+      const initialPlans = [
+        { operator: 'Airtel', amount: 199, validity: '28 days', data: '1GB/day', description: 'Unlimited calls + SMS' },
+        { operator: 'Jio', amount: 299, validity: '56 days', data: '2GB/day', description: 'Unlimited calls + 100 SMS/day' },
+        { operator: 'Vi', amount: 399, validity: '84 days', data: '1.5GB/day', description: 'Unlimited calls + Weekend data rollover' },
+        { operator: 'BSNL', amount: 149, validity: '30 days', data: '1GB/day', description: 'Unlimited calls + 100 SMS/day' }
+      ];
+      
+      await Plan.insertMany(initialPlans);
+      console.log('Initial plans seeded');
+    }
+  })
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Auth Routes
