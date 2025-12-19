@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from './models/User.js';
 import Transaction from './models/Transaction.js';
+import Plan from './models/Plan.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -85,14 +86,44 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Recharge Plans
-app.get('/api/plans', (req, res) => {
-  const plans = [
-    { id: 1, operator: 'Airtel', amount: 199, validity: '28 days', data: '1GB/day', description: 'Unlimited calls + SMS' },
-    { id: 2, operator: 'Jio', amount: 299, validity: '56 days', data: '2GB/day', description: 'Unlimited calls + 100 SMS/day' },
-    { id: 3, operator: 'Vi', amount: 399, validity: '84 days', data: '1.5GB/day', description: 'Unlimited calls + Weekend data rollover' },
-    { id: 4, operator: 'BSNL', amount: 149, validity: '30 days', data: '1GB/day', description: 'Unlimited calls + 100 SMS/day' }
-  ];
-  res.json(plans);
+app.get('/api/plans', async (req, res) => {
+  try {
+    const plans = await Plan.find();
+    res.json(plans);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch plans' });
+  }
+});
+
+// Admin: Create plan
+app.post('/api/admin/plans', async (req, res) => {
+  try {
+    const plan = new Plan(req.body);
+    await plan.save();
+    res.status(201).json(plan);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to create plan' });
+  }
+});
+
+// Admin: Update plan
+app.put('/api/admin/plans/:id', async (req, res) => {
+  try {
+    const plan = await Plan.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(plan);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update plan' });
+  }
+});
+
+// Admin: Delete plan
+app.delete('/api/admin/plans/:id', async (req, res) => {
+  try {
+    await Plan.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Plan deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete plan' });
+  }
 });
 
 // Auth middleware
@@ -169,11 +200,29 @@ app.get('/api/admin/stats', async (req, res) => {
     ]);
     const successRate = await Transaction.countDocuments({ status: 'success' });
     
+    const operatorStats = await Transaction.aggregate([
+      { $group: { _id: '$operator', count: { $sum: 1 }, revenue: { $sum: '$amount' } } }
+    ]);
+    
+    const dailyStats = await Transaction.aggregate([
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+          revenue: { $sum: '$amount' }
+        }
+      },
+      { $sort: { _id: 1 } },
+      { $limit: 7 }
+    ]);
+    
     res.json({
       totalUsers,
       totalTransactions,
       totalRevenue: totalRevenue[0]?.total || 0,
-      successRate: totalTransactions > 0 ? ((successRate / totalTransactions) * 100).toFixed(1) : 0
+      successRate: totalTransactions > 0 ? ((successRate / totalTransactions) * 100).toFixed(1) : 0,
+      operatorStats,
+      dailyStats
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch statistics' });

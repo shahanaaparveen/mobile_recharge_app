@@ -4,16 +4,21 @@ import { api } from '../utils/api';
 const Admin = () => {
   const [stats, setStats] = useState({});
   const [transactions, setTransactions] = useState([]);
-  const [plans] = useState([
-    { id: 1, operator: 'Airtel', amount: 199, validity: '28 days', data: '1GB/day' },
-    { id: 2, operator: 'Jio', amount: 299, validity: '56 days', data: '2GB/day' },
-    { id: 3, operator: 'Vi', amount: 399, validity: '84 days', data: '1.5GB/day' },
-    { id: 4, operator: 'BSNL', amount: 149, validity: '30 days', data: '1GB/day' }
-  ]);
+  const [plans, setPlans] = useState([]);
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
+  const [planForm, setPlanForm] = useState({
+    operator: '',
+    amount: '',
+    validity: '',
+    data: '',
+    description: ''
+  });
 
   useEffect(() => {
     fetchStats();
     fetchTransactions();
+    fetchPlans();
   }, []);
 
   const fetchStats = async () => {
@@ -34,6 +39,108 @@ const Admin = () => {
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
     }
+  };
+
+  const fetchPlans = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plans`);
+      const data = await response.json();
+      setPlans(data);
+    } catch (error) {
+      console.error('Failed to fetch plans:', error);
+    }
+  };
+
+  const handlePlanSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const url = editingPlan 
+        ? `${import.meta.env.VITE_API_URL}/api/admin/plans/${editingPlan._id}`
+        : `${import.meta.env.VITE_API_URL}/api/admin/plans`;
+      
+      const method = editingPlan ? 'PUT' : 'POST';
+      
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(planForm)
+      });
+      
+      fetchPlans();
+      setShowPlanModal(false);
+      setEditingPlan(null);
+      setPlanForm({ operator: '', amount: '', validity: '', data: '', description: '' });
+    } catch (error) {
+      console.error('Failed to save plan:', error);
+    }
+  };
+
+  const handleEditPlan = (plan) => {
+    setEditingPlan(plan);
+    setPlanForm(plan);
+    setShowPlanModal(true);
+  };
+
+  const handleDeletePlan = async (id) => {
+    if (confirm('Are you sure you want to delete this plan?')) {
+      try {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/admin/plans/${id}`, {
+          method: 'DELETE'
+        });
+        fetchPlans();
+      } catch (error) {
+        console.error('Failed to delete plan:', error);
+      }
+    }
+  };
+
+  const BarChart = ({ data, title }) => {
+    const maxValue = Math.max(...data.map(d => d.value));
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{title}</h3>
+        <div className="space-y-3">
+          {data.map((item, index) => (
+            <div key={index} className="flex items-center">
+              <div className="w-20 text-sm text-gray-600 dark:text-gray-400">{item.label}</div>
+              <div className="flex-1 mx-3">
+                <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 h-4 rounded-full transition-all duration-500"
+                    style={{ width: `${(item.value / maxValue) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+              <div className="w-16 text-sm font-medium text-gray-900 dark:text-white text-right">
+                {item.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const LineChart = ({ data, title }) => {
+    const maxValue = Math.max(...data.map(d => d.value));
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{title}</h3>
+        <div className="h-40 flex items-end space-x-2">
+          {data.map((item, index) => (
+            <div key={index} className="flex-1 flex flex-col items-center">
+              <div 
+                className="w-full bg-gradient-to-t from-green-500 to-green-300 rounded-t transition-all duration-500"
+                style={{ height: `${(item.value / maxValue) * 120}px` }}
+              ></div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 mt-2 transform -rotate-45">
+                {item.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -92,31 +199,62 @@ const Admin = () => {
           </div>
         </div>
 
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <BarChart 
+            data={stats.operatorStats?.map(op => ({ label: op._id, value: op.count })) || []}
+            title="Transactions by Operator"
+          />
+          <LineChart 
+            data={stats.dailyStats?.map(day => ({ label: day._id.slice(-5), value: day.count })) || []}
+            title="Daily Transactions (Last 7 Days)"
+          />
+        </div>
+
         {/* Plans Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg mb-8">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recharge Plans</h2>
+            <button 
+              onClick={() => setShowPlanModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <i className="fas fa-plus mr-2"></i>Add Plan
+            </button>
           </div>
           <div className="p-6">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-3 text-gray-600 dark:text-gray-400">ID</th>
                     <th className="text-left py-3 text-gray-600 dark:text-gray-400">Operator</th>
                     <th className="text-left py-3 text-gray-600 dark:text-gray-400">Amount</th>
                     <th className="text-left py-3 text-gray-600 dark:text-gray-400">Validity</th>
                     <th className="text-left py-3 text-gray-600 dark:text-gray-400">Data</th>
+                    <th className="text-left py-3 text-gray-600 dark:text-gray-400">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {plans.map((plan) => (
-                    <tr key={plan.id} className="border-b border-gray-100 dark:border-gray-700">
-                      <td className="py-3 text-gray-900 dark:text-white">{plan.id}</td>
+                    <tr key={plan._id} className="border-b border-gray-100 dark:border-gray-700">
                       <td className="py-3 text-gray-900 dark:text-white">{plan.operator}</td>
                       <td className="py-3 text-gray-900 dark:text-white">₹{plan.amount}</td>
                       <td className="py-3 text-gray-900 dark:text-white">{plan.validity}</td>
                       <td className="py-3 text-gray-900 dark:text-white">{plan.data}</td>
+                      <td className="py-3">
+                        <button 
+                          onClick={() => handleEditPlan(plan)}
+                          className="text-blue-600 hover:text-blue-800 mr-3"
+                        >
+                          <i className="fas fa-edit"></i>
+                        </button>
+                        <button 
+                          onClick={() => handleDeletePlan(plan._id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <i className="fas fa-trash"></i>
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -171,6 +309,80 @@ const Admin = () => {
             </div>
           </div>
         </div>
+
+        {/* Plan Modal */}
+        {showPlanModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                {editingPlan ? 'Edit Plan' : 'Add New Plan'}
+              </h3>
+              <form onSubmit={handlePlanSubmit}>
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Operator"
+                    value={planForm.operator}
+                    onChange={(e) => setPlanForm({...planForm, operator: e.target.value})}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
+                  />
+                  <input
+                    type="number"
+                    placeholder="Amount"
+                    value={planForm.amount}
+                    onChange={(e) => setPlanForm({...planForm, amount: e.target.value})}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Validity (e.g., 28 days)"
+                    value={planForm.validity}
+                    onChange={(e) => setPlanForm({...planForm, validity: e.target.value})}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Data (e.g., 1GB/day)"
+                    value={planForm.data}
+                    onChange={(e) => setPlanForm({...planForm, data: e.target.value})}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Description"
+                    value={planForm.description}
+                    onChange={(e) => setPlanForm({...planForm, description: e.target.value})}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPlanModal(false);
+                      setEditingPlan(null);
+                      setPlanForm({ operator: '', amount: '', validity: '', data: '', description: '' });
+                    }}
+                    className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    {editingPlan ? 'Update' : 'Create'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
